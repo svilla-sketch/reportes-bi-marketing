@@ -1,0 +1,130 @@
+{
+  "2026": {
+    "1": {
+      "KOS": {
+        "leads": 100,
+        "cal": 8,
+        "agen": 6,
+        "conc": 5,
+        "apar": 0,
+        "pres": 6142
+      },
+      "Punto Calma": {
+        "leads": 370,
+        "cal": 30,
+        "agen": 22,
+        "conc": 20,
+        "apar": 2,
+        "pres": 6296
+      },
+      "Zen": {
+        "leads": 185,
+        "cal": 15,
+        "agen": 11,
+        "conc": 10,
+        "apar": 1,
+        "pres": 9259
+      },
+      "DODEKA": {
+        "leads": 0,
+        "cal": 0,
+        "agen": 0,
+        "conc": 0,
+        "apar": 0,
+        "pres": 0
+      },
+      "SANTI\u00c1N": {
+        "leads": 0,
+        "cal": 0,
+        "agen": 0,
+        "conc": 0,
+        "apar": 0,
+        "pres": 0
+      }
+    },
+    "2": {
+      "KOS": {
+        "leads": 185,
+        "cal": 14,
+        "agen": 11,
+        "conc": 10,
+        "apar": 1,
+        "pres": 14814
+      },
+      "Punto Calma": {
+        "leads": 463,
+        "cal": 28,
+        "agen": 22,
+        "conc": 20,
+        "apar": 2,
+        "pres": 6481
+      },
+      "Zen": {
+        "leads": 278,
+        "cal": 14,
+        "agen": 11,
+        "conc": 9,
+        "apar": 1,
+        "pres": 9722
+      },
+      "DODEKA": {
+        "leads": 0,
+        "cal": 0,
+        "agen": 0,
+        "conc": 0,
+        "apar": 0,
+        "pres": 0
+      },
+      "SANTI\u00c1N": {
+        "leads": 0,
+        "cal": 0,
+        "agen": 0,
+        "conc": 0,
+        "apar": 0,
+        "pres": 0
+      }
+    },
+    "3": {
+      "KOS": {
+        "leads": 0,
+        "cal": 0,
+        "agen": 0,
+        "conc": 0,
+        "apar": 0,
+        "pres": 0
+      },
+      "Punto Calma": {
+        "leads": 463,
+        "cal": 28,
+        "agen": 22,
+        "conc": 20,
+        "apar": 2,
+        "pres": 6944
+      },
+      "Zen": {
+        "leads": 555,
+        "cal": 28,
+        "agen": 22,
+        "conc": 20,
+        "apar": 2,
+        "pres": 19444
+      },
+      "DODEKA": {
+        "leads": 0,
+        "cal": 0,
+        "agen": 0,
+        "conc": 0,
+        "apar": 0,
+        "pres": 0
+      },
+      "SANTI\u00c1N": {
+        "leads": 0,
+        "cal": 0,
+        "agen": 0,
+        "conc": 0,
+        "apar": 0,
+        "pres": 0
+      }
+    }
+  }
+}

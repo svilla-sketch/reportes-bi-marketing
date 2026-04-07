@@ -33,7 +33,7 @@
         "apar": 0,
         "pres": 0
       },
-      "SANTI\u00c1N": {
+      "SANTIÁN": {
         "leads": 0,
         "cal": 0,
         "agen": 0,
@@ -75,7 +75,7 @@
         "apar": 0,
         "pres": 0
       },
-      "SANTI\u00c1N": {
+      "SANTIÁN": {
         "leads": 0,
         "cal": 0,
         "agen": 0,
@@ -117,7 +117,7 @@
         "apar": 0,
         "pres": 0
       },
-      "SANTI\u00c1N": {
+      "SANTIÁN": {
         "leads": 0,
         "cal": 0,
         "agen": 0,
@@ -125,6 +125,27 @@
         "apar": 0,
         "pres": 0
       }
+    },
+    "4": {
+      "KOS": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "Punto Calma": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "Zen": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "DODEKA": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "SANTIÁN": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0}
+    },
+    "5": {
+      "KOS": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "Punto Calma": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "Zen": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "DODEKA": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "SANTIÁN": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0}
+    },
+    "6": {
+      "KOS": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "Punto Calma": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "Zen": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "DODEKA": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0},
+      "SANTIÁN": {"leads": 0, "cal": 0, "agen": 0, "conc": 0, "apar": 0, "pres": 0}
     }
   }
 }

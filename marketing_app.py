@@ -281,6 +281,8 @@ _METAS_PROJS = ["KOS", "Punto Calma", "Zen", "DODEKA", "SANTIÁN"]
 _METAS_KEYS  = ["leads", "cal", "agen", "conc", "apar", "pres"]
 _METAS_COLS  = ["Leads", "Cal.", "Agen.", "Conc.", "Apar.", "Presup. $"]
 _Q1 = {1: "Enero", 2: "Febrero", 3: "Marzo"}
+_Q2 = {4: "Abril", 5: "Mayo", 6: "Junio"}
+_QUARTERS = {"Q1 2026": _Q1, "Q2 2026": _Q2}
 
 def _metas_load():
     try:
@@ -1282,11 +1284,17 @@ elif "Embudo" in seccion:
 # SECCIÓN: METAS
 # ══════════════════════════════════════════════════════════════════════════════
 elif "Metas" in seccion:
-    st.markdown("## 🎯 Metas Trimestrales Q1 2026")
-
     _mdata = _metas_load()
     _today = _dt.date.today()
     _META_YEAR = 2026
+
+    # Selector de trimestre
+    _q_sel = st.radio("Trimestre", list(_QUARTERS.keys()), horizontal=True,
+                      key="metas_quarter")
+    _Q_ACTIVE = _QUARTERS[_q_sel]
+    _Q_LABEL  = _q_sel  # e.g. "Q1 2026"
+
+    st.markdown(f"## 🎯 Metas Trimestrales {_Q_LABEL}")
 
     # ── Helper: celda de progreso ─────────────────────────────────────────────
     def _meta_cell(real, meta, factor, is_money=False):
@@ -1444,14 +1452,13 @@ elif "Metas" in seccion:
         _html += "</tbody></table>"
         st.markdown(_html, unsafe_allow_html=True)
 
-    # ── Tabs: mes más reciente primero + Resumen Q1 ───────────────────────────
-    # Determinar meses ya transcurridos/actuales en Q1 2026
-    _q1_months = list(_Q1.items())  # [(1,"Enero"),(2,"Febrero"),(3,"Marzo")]
+    # ── Tabs: mes más reciente primero + Resumen trimestre ───────────────────
+    _q_months = list(_Q_ACTIVE.items())  # e.g. [(1,"Enero"),(2,"Febrero"),(3,"Marzo")]
     _months_ordered = sorted(
-        _q1_months,
+        _q_months,
         key=lambda x: -(x[0] if (_META_YEAR < _today.year or x[0] <= _today.month) else 99)
-    )  # Marzo primero (o el mes más reciente del Q)
-    _tab_labels = [mname for _, mname in _months_ordered] + ["📊 Resumen Q1"]
+    )  # Mes más reciente del trimestre primero
+    _tab_labels = [mname for _, mname in _months_ordered] + [f"📊 Resumen {_Q_LABEL}"]
     _all_cv_tabs = st.tabs(_tab_labels)
 
     # Tabs mensuales
@@ -1467,9 +1474,9 @@ elif "Metas" in seccion:
                 _fac, _flbl = 0.0, "Mes futuro — sin comparación disponible"
             _cv_render_table([_mnum], _fac, _flbl)
 
-    # Tab Resumen Q1
+    # Tab Resumen trimestre
     with _all_cv_tabs[-1]:
-        _q_all_months = [m for m, _ in _q1_months]
+        _q_all_months = [m for m, _ in _q_months]
         _q_total_days = sum(_cal.monthrange(_META_YEAR, m)[1] for m in _q_all_months)
         if _today.year == _META_YEAR and _today.month <= max(_q_all_months):
             _q_elapsed = sum(
@@ -1479,7 +1486,7 @@ elif "Metas" in seccion:
         else:
             _q_elapsed = _q_total_days
         _q_factor = min(_q_elapsed / _q_total_days, 1.0)
-        _q_flbl = f"Q1 2026: {_q_elapsed} de {_q_total_days} días — {_q_factor*100:.0f}% del trimestre transcurrido"
+        _q_flbl = f"{_Q_LABEL}: {_q_elapsed} de {_q_total_days} días — {_q_factor*100:.0f}% del trimestre transcurrido"
         _cv_render_table(_q_all_months, _q_factor, _q_flbl)
 
     st.divider()
@@ -1489,17 +1496,24 @@ elif "Metas" in seccion:
 
     # Inicializar session_state desde el archivo si la key no existe todavía
     # (evita que Streamlit ignore el value= cuando ya hay un key en session_state)
-    for _im in _Q1:
+    for _im in _Q_ACTIVE:
         for _ip in _METAS_PROJS:
             for _ik in _METAS_KEYS:
                 _sk = f"m_{_im}_{_ip}_{_ik}"
                 if _sk not in st.session_state:
                     st.session_state[_sk] = _meta_get(_mdata, _META_YEAR, _im, _ip, _ik)
 
-    _cfg_tabs = st.tabs(list(_Q1.values()))
-    _new_mdata = {str(_META_YEAR): {str(m): {p: {} for p in _METAS_PROJS} for m in _Q1}}
+    _cfg_tabs = st.tabs(list(_Q_ACTIVE.values()))
+    # Preservar meses de todos los trimestres al guardar
+    _new_mdata = {str(_META_YEAR): {str(m): _mdata.get(str(_META_YEAR), {}).get(str(m), {p: {} for p in _METAS_PROJS})
+                  for m in range(1, 13)}}
+    # Inicializar proyectos faltantes
+    for _nm in range(1, 13):
+        for _np in _METAS_PROJS:
+            if _np not in _new_mdata[str(_META_YEAR)][str(_nm)]:
+                _new_mdata[str(_META_YEAR)][str(_nm)][_np] = {}
 
-    for _ctab, (_cmnum, _cmname) in zip(_cfg_tabs, _Q1.items()):
+    for _ctab, (_cmnum, _cmname) in zip(_cfg_tabs, _Q_ACTIVE.items()):
         with _ctab:
             _hcols = st.columns([2, 1, 1, 1, 1, 1, 1])
             for _ci, _clbl in enumerate(["Proyecto"] + _METAS_COLS):
@@ -1523,7 +1537,7 @@ elif "Metas" in seccion:
     if st.button("💾 Guardar Metas", type="primary", use_container_width=True):
         _metas_save(_new_mdata)
         # Limpiar session_state para que al recargar lea los valores del archivo
-        for _im in _Q1:
+        for _im in _Q_ACTIVE:
             for _ip in _METAS_PROJS:
                 for _ik in _METAS_KEYS:
                     st.session_state.pop(f"m_{_im}_{_ip}_{_ik}", None)

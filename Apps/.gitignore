@@ -1,0 +1,22 @@
+# Solo incluir archivos del app de marketing
+*.pbix
+*.xlsx
+*.bat
+*.lnk
+*.csv
+*.spec
+__pycache__/
+*.pyc
+*.pyo
+.streamlit/secrets.toml
+
+# Apps de otras áreas
+tesoreria_app.py
+asistencias_app/
+
+# Build/dist
+build/
+dist/
+
+# Versiones antiguas
+Versiones Pasadas/

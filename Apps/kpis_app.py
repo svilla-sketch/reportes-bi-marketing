@@ -1,11 +1,13 @@
 """
 KPIs Q2 2026 — PISO
-Fuente: Apps/kpis_q2.xlsx  |  Persistencia: Supabase tabla kpis_scores_q2
+Fuente: Apps/kpis_q2.xlsx  |  Persistencia: GitHub file API (Apps/kpis_scores_q2_data.json)
 """
 
 import streamlit as st
 import pandas as pd
 import hashlib
+import json
+import base64
 import requests
 from pathlib import Path
 
@@ -61,41 +63,55 @@ st.markdown("""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SUPABASE
+# GITHUB FILE STORAGE
+# Almacena scores como JSON en el mismo repo de GitHub.
+# No requiere tabla de Supabase ni ningún setup externo.
 # ─────────────────────────────────────────────────────────────────────────────
-def _sb_headers() -> dict:
-    key = st.secrets["supabase"]["anon_key"]
+_GH_REPO    = "svilla-sketch/reportes-bi-marketing"
+_GH_PATH    = "Apps/kpis_scores_q2_data.json"
+_GH_API     = f"https://api.github.com/repos/{_GH_REPO}/contents/{_GH_PATH}"
+
+
+def _gh_headers() -> dict:
+    token = st.secrets["github"]["token"]
     return {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates",
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
     }
 
-def _sb_url() -> str:
-    return st.secrets["supabase"]["url"] + "/rest/v1/kpis_scores_q2"
 
-
-def sb_load() -> dict:
-    """Devuelve dict {id: score} desde Supabase."""
+def gh_load() -> dict:
+    """Carga scores desde GitHub. Devuelve {} si no existe todavía."""
     try:
-        r = requests.get(_sb_url(), headers=_sb_headers(), timeout=5)
+        r = requests.get(_GH_API, headers=_gh_headers(), timeout=6)
         if r.status_code == 200:
-            return {row["id"]: row["score"] for row in r.json()}
+            content = base64.b64decode(r.json()["content"]).decode("utf-8")
+            return json.loads(content)
     except Exception:
         pass
     return {}
 
 
-def sb_save(records: list[dict]):
-    """Upsert lista de {id, score} en Supabase."""
+def gh_save(scores: dict):
+    """Guarda scores como JSON en GitHub (crea o actualiza el archivo)."""
     try:
-        requests.post(
-            _sb_url(),
-            headers=_sb_headers(),
-            json=records,
-            timeout=10,
-        )
+        content_b64 = base64.b64encode(
+            json.dumps(scores, ensure_ascii=False, indent=2).encode("utf-8")
+        ).decode("utf-8")
+
+        # Obtener sha actual (necesario para actualizar)
+        r = requests.get(_GH_API, headers=_gh_headers(), timeout=6)
+        sha = r.json().get("sha") if r.status_code == 200 else None
+
+        payload: dict = {
+            "message": "Update KPIs Q2 scores",
+            "content": content_b64,
+            "committer": {"name": "PISO KPIs App", "email": "kpis@piso.app"},
+        }
+        if sha:
+            payload["sha"] = sha
+
+        requests.put(_GH_API, headers=_gh_headers(), json=payload, timeout=10)
     except Exception:
         pass
 
@@ -142,41 +158,28 @@ def load_data() -> pd.DataFrame:
 # SCORES EN SESSION STATE
 # ─────────────────────────────────────────────────────────────────────────────
 def init_scores(df: pd.DataFrame):
-    """Carga scores desde Supabase y los pone en session_state."""
-    remote = sb_load()
+    """Carga scores desde GitHub y los pone en session_state."""
+    remote = gh_load()
 
-    scores = {
+    base = {
         "empresa":      {p: 0 for p in PROJECT_META},
         "kpis":         {row["uid"]: 0 for _, row in df.iterrows()},
         "discrecional": {},
     }
 
-    for sid, val in remote.items():
-        if sid.startswith("emp__"):
-            proj = sid[5:]
-            if proj in scores["empresa"]:
-                scores["empresa"][proj] = int(val)
-        elif sid.startswith("kpi__"):
-            uid = sid[5:]
-            if uid in scores["kpis"]:
-                scores["kpis"][uid] = int(val)
-        elif sid.startswith("disc__"):
-            persona = sid[6:]
-            scores["discrecional"][persona] = int(val)
+    # Merge remote data
+    base["empresa"].update(remote.get("empresa", {}))
+    for uid in base["kpis"]:
+        if uid in remote.get("kpis", {}):
+            base["kpis"][uid] = remote["kpis"][uid]
+    base["discrecional"] = remote.get("discrecional", {})
 
-    st.session_state.scores = scores
+    st.session_state.scores = base
 
 
 def save_scores(scores: dict):
-    """Guarda todos los scores en Supabase."""
-    records = []
-    for proj, val in scores["empresa"].items():
-        records.append({"id": f"emp__{proj}", "score": val})
-    for uid, val in scores["kpis"].items():
-        records.append({"id": f"kpi__{uid}", "score": val})
-    for persona, val in scores.get("discrecional", {}).items():
-        records.append({"id": f"disc__{persona}", "score": val})
-    sb_save(records)
+    """Guarda todos los scores en GitHub."""
+    gh_save(scores)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -508,10 +511,11 @@ def main():
         st.divider()
 
         if st.button("💾 Guardar cambios", type="primary", use_container_width=True):
-            save_scores(scores)
-            st.success("✅ Guardado en la nube")
+            with st.spinner("Guardando…"):
+                save_scores(scores)
+            st.success("✅ Guardado")
 
-        st.caption("Cambios guardados en Supabase — accesibles desde cualquier dispositivo.")
+        st.caption("Cambios guardados en GitHub — accesibles desde cualquier dispositivo.")
 
     if vista == "📊 Empresa":
         view_empresa(scores)

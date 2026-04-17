@@ -1,22 +1,28 @@
-# Solo incluir archivos del app de marketing
-*.pbix
-*.xlsx
-*.bat
-*.lnk
-*.csv
-*.spec
+# Secrets
+.streamlit/secrets.toml
+Apps/.streamlit/secrets.toml
+*.env
+.env.*
+
+# Scores locales (se usa Supabase en producción)
+Apps/kpis_scores_q2.json
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
-.streamlit/secrets.toml
+.venv/
+venv/
 
-# Apps de otras áreas
-tesoreria_app.py
-asistencias_app/
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# Build/dist
-build/
-dist/
+# Office temp files
+~$*
 
-# Versiones antiguas
-Versiones Pasadas/
+# Large files no necesarios en repo
+*.pbix
+*.lnk
+"Versiones Pasadas/"

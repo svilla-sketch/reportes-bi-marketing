@@ -1,10 +1,15 @@
 # Solo incluir archivos del app de marketing
 *.pbix
-*.xlsx
-*.bat
 *.lnk
-*.csv
 *.spec
+# Excluir xlsx en general, EXCEPTO el de KPIs
+*.xlsx
+!kpis_q2.xlsx
+# Excluir csv en general, EXCEPTO datos de tesorería si los hubiera
+*.csv
+# Bats ignorados en general salvo los launchers de apps
+*.bat
+!Iniciar_*.bat
 __pycache__/
 *.pyc
 *.pyo

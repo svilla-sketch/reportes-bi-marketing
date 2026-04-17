@@ -276,7 +276,8 @@ def _load_vambe_tags_cached(): return load_vambe_pipeline_with_tags()
 def _load_vambe_all_projects_cached(): return load_vambe_all_with_projects(365)
 
 # ── Metas helpers ─────────────────────────────────────────────────────────────
-_METAS_FILE = os.path.join(os.getcwd(), "metas_q.json")
+# Usar __file__ para que la ruta sea siempre relativa al script, no al CWD
+_METAS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "metas_q.json")
 _METAS_PROJS = ["KOS", "Punto Calma", "Zen", "DODEKA", "SANTIÁN"]
 _METAS_KEYS  = ["leads", "cal", "agen", "conc", "apar", "pres"]
 _METAS_COLS  = ["Leads", "Cal.", "Agen.", "Conc.", "Apar.", "Presup. $"]
@@ -284,7 +285,25 @@ _Q1 = {1: "Enero", 2: "Febrero", 3: "Marzo"}
 _Q2 = {4: "Abril", 5: "Mayo", 6: "Junio"}
 _QUARTERS = {"Q1 2026": _Q1, "Q2 2026": _Q2}
 
+# Clave de Supabase para guardar metas (persistencia cross-deploy)
+_METAS_SUPA_TABLE = "marketing_metas"
+
 def _metas_load():
+    """Carga metas: primero intenta Supabase, luego JSON local."""
+    # 1. Intentar Supabase
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/{_METAS_SUPA_TABLE}?select=data&order=id.desc&limit=1",
+            headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}"},
+            timeout=5
+        )
+        if resp.status_code == 200:
+            rows = resp.json()
+            if rows and "data" in rows[0] and rows[0]["data"]:
+                return rows[0]["data"]
+    except Exception:
+        pass
+    # 2. Fallback: archivo local
     try:
         with open(_METAS_FILE) as f:
             return json.load(f)
@@ -292,8 +311,28 @@ def _metas_load():
         return {}
 
 def _metas_save(data):
-    with open(_METAS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+    """Guarda metas: en Supabase (upsert fila id=1) Y en JSON local."""
+    # 1. Guardar en Supabase
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/{_METAS_SUPA_TABLE}",
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates",
+            },
+            json={"id": 1, "data": data},
+            timeout=5
+        )
+    except Exception:
+        pass
+    # 2. Siempre guardar localmente también
+    try:
+        with open(_METAS_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
 
 def _meta_get(data, year, month, proj, key):
     return float(data.get(str(year), {}).get(str(month), {}).get(proj, {}).get(key, 0))
@@ -1288,11 +1327,14 @@ elif "Metas" in seccion:
     _today = _dt.date.today()
     _META_YEAR = 2026
 
-    # Selector de trimestre
+    # Selector de trimestre — default Q2 si estamos en abril-junio
+    _default_q_idx = 1 if _today.month >= 4 else 0
+    if "metas_quarter" not in st.session_state:
+        st.session_state["metas_quarter"] = list(_QUARTERS.keys())[_default_q_idx]
     _q_sel = st.radio("Trimestre", list(_QUARTERS.keys()), horizontal=True,
                       key="metas_quarter")
     _Q_ACTIVE = _QUARTERS[_q_sel]
-    _Q_LABEL  = _q_sel  # e.g. "Q1 2026"
+    _Q_LABEL  = _q_sel  # e.g. "Q2 2026"
 
     st.markdown(f"## 🎯 Metas Trimestrales {_Q_LABEL}")
 

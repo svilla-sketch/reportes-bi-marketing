@@ -1,533 +1,800 @@
 """
 KPIs Q2 2026 — PISO
-Fuente: Apps/kpis_q2.xlsx  |  Persistencia: GitHub file API (Apps/kpis_scores_q2_data.json)
+Diseño: Dark theme inspirado en pisokpis.netlify.app
 """
 
 import streamlit as st
 import pandas as pd
-import hashlib
-import json
-import base64
-import requests
+import hashlib, json, base64, requests
 from pathlib import Path
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CONFIG
-# ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="KPIs Q2 2026 — PISO",
     page_icon="🏢",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 BASE_DIR   = Path(__file__).parent.resolve()
 EXCEL_PATH = BASE_DIR / "kpis_q2.xlsx"
 
-SOCIOS = [
-    "Juan Ramón Moreno Flores",
-    "Víctor Villa Walls",
-    "Saúl Villa",
-]
+# ─── GitHub storage ───────────────────────────────────────────────────────────
+_GH_REPO = "svilla-sketch/reportes-bi-marketing"
+_GH_PATH = "Apps/kpis_scores_q2_data.json"
+_GH_API  = f"https://api.github.com/repos/{_GH_REPO}/contents/{_GH_PATH}"
 
+def _gh_headers():
+    return {"Authorization": f"token {st.secrets['github']['token']}",
+            "Accept": "application/vnd.github.v3+json"}
+
+def gh_load():
+    try:
+        r = requests.get(_GH_API, headers=_gh_headers(), timeout=6)
+        if r.status_code == 200:
+            return json.loads(base64.b64decode(r.json()["content"]).decode())
+    except Exception: pass
+    return {}
+
+def gh_save(scores):
+    try:
+        content_b64 = base64.b64encode(
+            json.dumps(scores, ensure_ascii=False, indent=2).encode()).decode()
+        r = requests.get(_GH_API, headers=_gh_headers(), timeout=6)
+        sha = r.json().get("sha") if r.status_code == 200 else None
+        payload = {"message": "Update KPIs Q2 scores",
+                   "content": content_b64,
+                   "committer": {"name": "PISO KPIs", "email": "kpis@piso.app"}}
+        if sha: payload["sha"] = sha
+        requests.put(_GH_API, headers=_gh_headers(), json=payload, timeout=10)
+    except Exception: pass
+
+# ─── Constantes ───────────────────────────────────────────────────────────────
 PROJECT_META = {
     "Kos":       "7 Escrituraciones",
-    "P.C.":      "Construcción del 66% del proyecto + 100% de comercialización",
-    "Santian":   "Inicio de comercialización, 2 ventas en el trimestre",
-    "Zen":       "Autorización CUS e inicio construcción / 4 ventas + crédito puente",
-    "Mar Negro": "Preparativo validado para inicio de proyecto",
+    "P.C.":      "Construcción del 66% + 100% comercialización",
+    "Santian":   "Inicio comercialización, 2 ventas",
+    "Zen":       "Autorización CUS + inicio construcción",
+    "Mar Negro": "Preparativo validado para inicio",
     "Colón":     "Compra terreno ante Notario",
     "Wacuz":     "Adquisición terreno e inicio preparativo N26",
-    "RRO":       "Inicio de Construcción Edificio Romero",
-    "Admin":     "100% funciones Admin en ERP / Reportes implementados al 100%",
+    "RRO":       "Inicio Construcción Edificio Romero",
+    "Admin":     "100% funciones Admin en ERP",
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ESTILOS
-# ─────────────────────────────────────────────────────────────────────────────
+PROJECT_COLORS = {
+    "Kos": "#3b82f6", "P.C.": "#ec4899", "Santian": "#10b981",
+    "Zen": "#8b5cf6", "Mar Negro": "#06b6d4", "Colón": "#f97316",
+    "Wacuz": "#14b8a6", "RRO": "#f59e0b", "Admin": "#64748b",
+}
+
+AVATAR_COLORS = [
+    "#6366f1","#8b5cf6","#06b6d4","#10b981","#f59e0b",
+    "#ef4444","#ec4899","#f97316","#14b8a6","#3b82f6",
+    "#a855f7","#22d3ee","#84cc16","#fb923c","#e879f9",
+    "#34d399","#fbbf24","#60a5fa",
+]
+
+INITIALS_MAP = {
+    "Armando Pérez":            "ARM",
+    "Rodrigo Rico":             "ROD",
+    "Miguel Elizalde":          "MIG",
+    "Joselin Vega":             "JSL",
+    "Juan Ramón Moreno Flores": "JRM",
+    "Mariana Irigoyen":         "MIR",
+    "Mariana Méndez":           "MIA",
+    "Saúl Villa":               "SVL",
+    "Sergio Oliva":             "SRG",
+    "Víctor Villa Walls":       "VVW",
+    "Ángel Vázquez":            "ANG",
+    "Óscar Valencia":           "OSC",
+    "Areli Carrasco":           "ARC",
+    "Adriana Carrasco":         "ADC",
+    "Brenda Quintero":          "BRD",
+    "Brianda Ramírez":          "BRI",
+    "Ana Serrano":              "ANS",
+    "Jorge Guerra":             "JRG",
+}
+
+SOCIOS = ["Juan Ramón Moreno Flores", "Víctor Villa Walls", "Saúl Villa"]
+
+# ─── CSS ──────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-.score-pill {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 0.9rem;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Reset Streamlit ── */
+html, body, [data-testid="stAppViewContainer"], .stApp {
+    background-color: #0f172a !important;
+    color: #e2e8f0 !important;
+    font-family: 'Inter', sans-serif !important;
 }
-.score-green  { background: #d1fae5; color: #065f46; }
-.score-yellow { background: #fef9c3; color: #713f12; }
-.score-red    { background: #fee2e2; color: #7f1d1d; }
-.kpi-row { padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+[data-testid="stHeader"] { background: #0f172a !important; border-bottom: 1px solid #1e293b; }
+[data-testid="stSidebar"] { background: #1e293b !important; }
+section[data-testid="stMain"] > div { padding-top: 1rem !important; }
+.block-container { padding: 1.5rem 2rem !important; max-width: 1400px !important; }
+
+/* ── Tabs ── */
+.stTabs [data-baseweb="tab-list"] {
+    background: #1e293b !important;
+    border-radius: 12px;
+    padding: 4px;
+    gap: 2px;
+    border: 1px solid #334155;
+}
+.stTabs [data-baseweb="tab"] {
+    background: transparent !important;
+    color: #94a3b8 !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    font-size: 0.85rem !important;
+    padding: 6px 16px !important;
+    border: none !important;
+}
+.stTabs [aria-selected="true"] {
+    background: #6366f1 !important;
+    color: #fff !important;
+}
+.stTabs [data-baseweb="tab-panel"] { padding-top: 1.5rem !important; }
+.stTabs [data-baseweb="tab-highlight"] { display: none !important; }
+
+/* ── Cards ── */
+.kpi-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+.stat-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    text-align: center;
+}
+.stat-card .stat-icon { font-size: 1.8rem; margin-bottom: 0.25rem; }
+.stat-card .stat-value { font-size: 2rem; font-weight: 700; margin: 4px 0; }
+.stat-card .stat-label { color: #94a3b8; font-size: 0.78rem; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; }
+.stat-card .stat-sub   { color: #64748b; font-size: 0.72rem; margin-top: 2px; }
+
+/* ── Avatar ── */
+.avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.9rem; color: #fff;
+    flex-shrink: 0; letter-spacing: 0.05em;
+    border: 2px solid rgba(255,255,255,0.15);
+}
+.avatar-sm {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.6rem; color: #fff; flex-shrink: 0;
+}
+
+/* ── Person header ── */
+.person-header {
+    display: flex; align-items: flex-start; gap: 14px; margin-bottom: 1.2rem;
+}
+.person-info { flex: 1; }
+.person-name { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; }
+.person-role { font-size: 0.78rem; color: #94a3b8; margin: 2px 0 6px; }
+.person-score-big { font-size: 2.2rem; font-weight: 800; min-width: 90px; text-align: right; }
+
+/* ── Badges ── */
+.badge {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 0.68rem; font-weight: 600; margin: 2px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.badge-equipo   { background: rgba(99,102,241,0.2); color: #818cf8; border-color: rgba(99,102,241,0.3); }
+.badge-ind      { background: rgba(16,185,129,0.2); color: #34d399; border-color: rgba(16,185,129,0.3); }
+.badge-socio    { background: rgba(245,158,11,0.2); color: #fbbf24; border-color: rgba(245,158,11,0.3); }
+
+/* ── KPI rows ── */
+.kpi-section-title {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: .1em;
+    color: #64748b; text-transform: uppercase;
+    border-bottom: 1px solid #273549;
+    padding-bottom: 6px; margin-bottom: 10px; margin-top: 14px;
+}
+.kpi-row {
+    padding: 8px 0;
+    border-bottom: 1px solid #1a2540;
+}
+.kpi-row:last-child { border-bottom: none; }
+.kpi-name { font-size: 0.85rem; font-weight: 500; color: #e2e8f0; margin-bottom: 3px; }
+.kpi-meta { font-size: 0.7rem; color: #64748b; margin-bottom: 5px; }
+.kpi-footer { display: flex; align-items: center; gap: 8px; }
+.kpi-pct { font-size: 0.85rem; font-weight: 700; min-width: 42px; }
+.kpi-bar-wrap {
+    flex: 1; height: 5px; background: #273549; border-radius: 3px; overflow: hidden;
+}
+.kpi-bar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+.kpi-status {
+    font-size: 0.65rem; font-weight: 600; padding: 2px 7px;
+    border-radius: 20px; white-space: nowrap;
+}
+.status-done   { background: rgba(16,185,129,0.15); color: #10b981; }
+.status-pend   { background: rgba(100,116,139,0.15); color: #64748b; }
+.status-prog   { background: rgba(245,158,11,0.15);  color: #f59e0b; }
+
+/* ── Score boxes ── */
+.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.score-box {
+    background: #273549; border-radius: 10px;
+    padding: 12px; border: 1px solid #334155;
+}
+.score-box-label { font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+.score-box-value { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
+.score-box-bar { height: 4px; background: #334155; border-radius: 2px; overflow:hidden; margin-bottom: 4px; }
+.score-box-sub { font-size: 0.65rem; color: #64748b; }
+
+.total-box {
+    background: linear-gradient(135deg, #1e293b 0%, #273549 100%);
+    border: 1px solid #334155; border-radius: 12px;
+    padding: 16px; text-align: center; margin-top: 10px;
+}
+.total-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.total-value { font-size: 2.8rem; font-weight: 800; line-height: 1; margin: 8px 0; }
+.financials { display: flex; justify-content: space-around; margin-top: 12px; padding-top: 12px; border-top: 1px solid #334155; }
+.fin-item { text-align: center; }
+.fin-label { font-size: 0.65rem; color: #64748b; }
+.fin-value { font-size: 0.9rem; font-weight: 700; color: #e2e8f0; }
+
+/* ── Empresa table ── */
+.obj-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid #1a2540;
+}
+.obj-row:last-child { border-bottom: none; }
+.obj-proj-badge {
+    padding: 3px 8px; border-radius: 6px; font-size: 0.7rem;
+    font-weight: 700; min-width: 72px; text-align: center; flex-shrink: 0;
+}
+.obj-name { flex: 1; font-size: 0.85rem; color: #e2e8f0; }
+.obj-pct { font-size: 0.9rem; font-weight: 700; min-width: 52px; text-align: right; }
+.obj-bar-wrap { width: 120px; height: 6px; background: #273549; border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+.obj-bar-fill { height: 100%; border-radius: 3px; }
+
+/* ── Rankings ── */
+.rank-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0; border-bottom: 1px solid #1a2540;
+}
+.rank-num { color: #475569; font-size: 0.75rem; min-width: 24px; }
+.rank-bar-wrap { flex: 1; height: 28px; background: #273549; border-radius: 6px; overflow: hidden; position: relative; }
+.rank-bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 10px; font-size: 0.78rem; font-weight: 600; color: #fff; }
+.rank-val { min-width: 50px; text-align: right; font-size: 0.85rem; font-weight: 700; }
+
+/* ── Inputs oscuros ── */
+.stNumberInput input, .stTextInput input, .stSelectbox select {
+    background: #273549 !important; color: #e2e8f0 !important;
+    border: 1px solid #334155 !important; border-radius: 8px !important;
+}
+.stSlider [data-baseweb="slider"] { padding: 0 !important; }
+div[data-testid="stMetricValue"] { color: #e2e8f0 !important; }
+
+/* ── Selectbox ── */
+div[data-baseweb="select"] > div {
+    background: #273549 !important; border-color: #334155 !important; border-radius: 8px !important;
+}
+div[data-baseweb="select"] span { color: #e2e8f0 !important; }
+[data-baseweb="popover"] { background: #1e293b !important; border: 1px solid #334155 !important; }
+[role="option"] { background: #1e293b !important; color: #e2e8f0 !important; }
+[role="option"]:hover { background: #273549 !important; }
+
+/* ── Pill selector ── */
+.pill-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1.2rem; }
+.pill {
+    padding: 5px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600;
+    cursor: pointer; border: 1px solid #334155;
+    background: #1e293b; color: #94a3b8;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.pill.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+/* ── Misc ── */
+h1, h2, h3 { color: #f1f5f9 !important; }
+.stButton > button {
+    background: #6366f1 !important; color: #fff !important;
+    border: none !important; border-radius: 8px !important;
+    font-weight: 600 !important;
+}
+.stButton > button:hover { background: #4f46e5 !important; }
+hr { border-color: #334155 !important; }
+[data-testid="stExpander"] {
+    background: #1e293b !important; border: 1px solid #334155 !important; border-radius: 10px !important;
+}
+.streamlit-expanderHeader { color: #e2e8f0 !important; font-weight: 600 !important; }
+label { color: #94a3b8 !important; font-size: 0.82rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GITHUB FILE STORAGE
-# Almacena scores como JSON en el mismo repo de GitHub.
-# No requiere tabla de Supabase ni ningún setup externo.
-# ─────────────────────────────────────────────────────────────────────────────
-_GH_REPO    = "svilla-sketch/reportes-bi-marketing"
-_GH_PATH    = "Apps/kpis_scores_q2_data.json"
-_GH_API     = f"https://api.github.com/repos/{_GH_REPO}/contents/{_GH_PATH}"
-
-
-def _gh_headers() -> dict:
-    token = st.secrets["github"]["token"]
-    return {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json",
-    }
-
-
-def gh_load() -> dict:
-    """Carga scores desde GitHub. Devuelve {} si no existe todavía."""
-    try:
-        r = requests.get(_GH_API, headers=_gh_headers(), timeout=6)
-        if r.status_code == 200:
-            content = base64.b64decode(r.json()["content"]).decode("utf-8")
-            return json.loads(content)
-    except Exception:
-        pass
-    return {}
-
-
-def gh_save(scores: dict):
-    """Guarda scores como JSON en GitHub (crea o actualiza el archivo)."""
-    try:
-        content_b64 = base64.b64encode(
-            json.dumps(scores, ensure_ascii=False, indent=2).encode("utf-8")
-        ).decode("utf-8")
-
-        # Obtener sha actual (necesario para actualizar)
-        r = requests.get(_GH_API, headers=_gh_headers(), timeout=6)
-        sha = r.json().get("sha") if r.status_code == 200 else None
-
-        payload: dict = {
-            "message": "Update KPIs Q2 scores",
-            "content": content_b64,
-            "committer": {"name": "PISO KPIs App", "email": "kpis@piso.app"},
-        }
-        if sha:
-            payload["sha"] = sha
-
-        requests.put(_GH_API, headers=_gh_headers(), json=payload, timeout=10)
-    except Exception:
-        pass
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# CARGA DE DATOS
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── Data loading ─────────────────────────────────────────────────────────────
 @st.cache_data
-def load_data() -> pd.DataFrame:
+def load_data():
     df = pd.read_excel(EXCEL_PATH, sheet_name="KPIs 2T", header=0)
     df.columns = df.columns.str.strip()
-
-    text_cols = [
-        "Proyecto", "Objetivo Empresa", "Objetivo Lider", "KPI",
-        "Responsable 1", "Responsable 2", "Responsable 3", "Lider", "Fecha",
-    ]
-    for col in text_cols:
+    for col in ["Proyecto","Objetivo Empresa","Objetivo Lider","KPI",
+                "Responsable 1","Responsable 2","Responsable 3","Lider","Fecha"]:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.strip()
-            df[col] = df[col].replace({"nan": "", "NaN": ""})
-
-    def classify(row):
-        r2 = str(row.get("Responsable 2", "")).strip()
-        r3 = str(row.get("Responsable 3", "")).strip()
-        return "equipo" if (r2 not in ("", "nan") or r3 not in ("", "nan")) else "individual"
-
+            df[col] = df[col].astype(str).str.strip().replace({"nan":"","NaN":""})
+    def classify(r):
+        return "equipo" if (r["Responsable 2"] not in ("","nan") or
+                            r["Responsable 3"] not in ("","nan")) else "individual"
     df["tipo"] = df.apply(classify, axis=1)
-
-    def make_uid(row):
-        content = "|".join([
-            row.get("Proyecto", ""),
-            row.get("KPI", ""),
-            row.get("Responsable 1", ""),
-            row.get("Responsable 2", ""),
-            row.get("Responsable 3", ""),
-        ])
-        return hashlib.md5(content.encode("utf-8")).hexdigest()[:12]
-
+    def make_uid(r):
+        c = "|".join([r.get(x,"") for x in ["Proyecto","KPI","Responsable 1","Responsable 2","Responsable 3"]])
+        return hashlib.md5(c.encode()).hexdigest()[:12]
     df["uid"] = df.apply(make_uid, axis=1)
     return df
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SCORES EN SESSION STATE
-# ─────────────────────────────────────────────────────────────────────────────
-def init_scores(df: pd.DataFrame):
-    """Carga scores desde GitHub y los pone en session_state."""
+# ─── Scores init/save ─────────────────────────────────────────────────────────
+def init_scores(df):
     remote = gh_load()
-
-    base = {
-        "empresa":      {p: 0 for p in PROJECT_META},
-        "kpis":         {row["uid"]: 0 for _, row in df.iterrows()},
-        "discrecional": {},
-    }
-
-    # Merge remote data
+    base = {"empresa": {p: 0 for p in PROJECT_META},
+            "kpis":    {r["uid"]: 0 for _, r in df.iterrows()},
+            "discrecional": {}}
     base["empresa"].update(remote.get("empresa", {}))
     for uid in base["kpis"]:
-        if uid in remote.get("kpis", {}):
-            base["kpis"][uid] = remote["kpis"][uid]
+        base["kpis"][uid] = remote.get("kpis", {}).get(uid, 0)
     base["discrecional"] = remote.get("discrecional", {})
-
     st.session_state.scores = base
 
-
-def save_scores(scores: dict):
-    """Guarda todos los scores en GitHub."""
-    gh_save(scores)
+def save_scores():
+    gh_save(st.session_state.scores)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CÁLCULOS
-# ─────────────────────────────────────────────────────────────────────────────
-def calc_empresa(scores: dict) -> float:
-    vals = [scores["empresa"].get(p, 0) for p in PROJECT_META]
-    return sum(vals) / len(vals) if vals else 0.0
+# ─── Calculations ─────────────────────────────────────────────────────────────
+def s_empresa():
+    v = list(st.session_state.scores["empresa"].values())
+    return sum(v)/len(v) if v else 0.0
+
+def s_equipo(persona, df):
+    m = (((df["Responsable 1"]==persona)|(df["Responsable 2"]==persona)|(df["Responsable 3"]==persona))
+         & (df["tipo"]=="equipo"))
+    k = df[m]
+    if k.empty: return 0.0
+    return sum(st.session_state.scores["kpis"].get(r["uid"],0) for _,r in k.iterrows()) / len(k)
+
+def s_individual(persona, df):
+    m = (df["Responsable 1"]==persona) & (df["tipo"]=="individual")
+    k = df[m]
+    if k.empty: return 0.0
+    return sum(st.session_state.scores["kpis"].get(r["uid"],0) for _,r in k.iterrows()) / len(k)
+
+def s_disc(persona):
+    return float(st.session_state.scores.get("discrecional",{}).get(persona,0)) * 10.0
+
+def s_total(persona, df):
+    return s_empresa()*0.30 + s_equipo(persona,df)*0.30 + s_individual(persona,df)*0.30 + s_disc(persona)*0.10
 
 
-def calc_equipo(persona: str, df: pd.DataFrame, scores: dict) -> float:
-    mask = (
-        (
-            (df["Responsable 1"] == persona)
-            | (df["Responsable 2"] == persona)
-            | (df["Responsable 3"] == persona)
-        )
-        & (df["tipo"] == "equipo")
-    )
-    kpis = df[mask]
-    if kpis.empty:
-        return 0.0
-    vals = [scores["kpis"].get(row["uid"], 0) for _, row in kpis.iterrows()]
-    return sum(vals) / len(vals)
+# ─── Helpers UI ───────────────────────────────────────────────────────────────
+def score_color(v):
+    if v >= 80: return "#10b981"
+    if v >= 60: return "#f59e0b"
+    return "#ef4444"
 
+def get_initials(name):
+    return INITIALS_MAP.get(name, name[:3].upper())
 
-def calc_individual(persona: str, df: pd.DataFrame, scores: dict) -> float:
-    mask = (df["Responsable 1"] == persona) & (df["tipo"] == "individual")
-    kpis = df[mask]
-    if kpis.empty:
-        return 0.0
-    vals = [scores["kpis"].get(row["uid"], 0) for _, row in kpis.iterrows()]
-    return sum(vals) / len(vals)
+def get_avatar_color(name):
+    idx = abs(hash(name)) % len(AVATAR_COLORS)
+    return AVATAR_COLORS[idx]
 
-
-def calc_disc_pct(persona: str, scores: dict) -> float:
-    return float(scores.get("discrecional", {}).get(persona, 0)) * 10.0
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPERS UI
-# ─────────────────────────────────────────────────────────────────────────────
-def pill(val: float) -> str:
-    cls = "score-green" if val >= 80 else ("score-yellow" if val >= 60 else "score-red")
-    return f'<span class="score-pill {cls}">{val:.1f}%</span>'
-
-
-def semaforo(val: float) -> str:
-    return "🟢" if val >= 80 else ("🟡" if val >= 60 else "🔴")
-
-
-def all_people(df: pd.DataFrame) -> list[str]:
+def all_people(df):
     return sorted([p for p in df["Responsable 1"].unique() if p])
 
+def people_by_lider(df, lider):
+    return sorted([p for p in df[df["Lider"]==lider]["Responsable 1"].unique() if p])
 
-def people_by_lider(df: pd.DataFrame, lider: str) -> list[str]:
-    return sorted([p for p in df[df["Lider"] == lider]["Responsable 1"].unique() if p])
+def project_badge_html(proyecto):
+    c = PROJECT_COLORS.get(proyecto, "#64748b")
+    return (f'<span class="badge" style="background:rgba({int(c[1:3],16)},{int(c[3:5],16)},'
+            f'{int(c[5:7],16)},0.2);color:{c};border-color:rgba({int(c[1:3],16)},'
+            f'{int(c[3:5],16)},{int(c[5:7],16)},0.4)">{proyecto}</span>')
+
+def kpi_status_html(pct):
+    if pct >= 100: return '<span class="kpi-status status-done">✓ Cumplido</span>'
+    if pct >   0:  return '<span class="kpi-status status-prog">↗ En progreso</span>'
+    return '<span class="kpi-status status-pend">○ Pendiente</span>'
+
+def bar_html(pct, color=None, height=5):
+    c = color or score_color(pct)
+    return (f'<div class="kpi-bar-wrap" style="height:{height}px">'
+            f'<div class="kpi-bar-fill" style="width:{min(pct,100)}%;background:{c}"></div></div>')
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# VISTA: EMPRESA
-# ─────────────────────────────────────────────────────────────────────────────
-def view_empresa(scores: dict):
-    st.header("📊 Meta Empresa (30%)")
-    st.markdown("Califica el cumplimiento de cada proyecto. El promedio = Score Empresa, igual para todos.")
+# ─── TOP HEADER ───────────────────────────────────────────────────────────────
+def render_header():
+    emp = s_empresa()
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.markdown('<div style="display:flex;align-items:center;gap:12px">'
+                    '<div style="background:#6366f1;border-radius:10px;padding:8px 12px;font-size:1.4rem">🏢</div>'
+                    '<div><div style="font-size:1.15rem;font-weight:700;color:#f1f5f9">KPIs Dashboard</div>'
+                    '<div style="font-size:0.75rem;color:#64748b">Medición de Objetivos — Q2 2026</div></div>'
+                    '</div>', unsafe_allow_html=True)
+    with col2:
+        c = score_color(emp)
+        st.markdown(f'<div style="text-align:right">'
+                    f'<span style="color:#64748b;font-size:0.8rem">Score empresa: </span>'
+                    f'<span style="color:{c};font-size:1.1rem;font-weight:800">{emp:.1f}%</span>&nbsp;&nbsp;'
+                    f'<span style="background:#6366f1;color:#fff;padding:4px 14px;border-radius:20px;font-size:0.8rem;font-weight:600">Q2 2026</span>'
+                    f'</div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:1px;background:#334155;margin:12px 0 0"></div>', unsafe_allow_html=True)
 
-    col_sliders, col_resumen = st.columns([3, 1])
 
-    with col_sliders:
+# ─── VISTA: RESUMEN ───────────────────────────────────────────────────────────
+def view_resumen(df):
+    emp = s_empresa()
+    people = all_people(df)
+    scores_list = [s_total(p, df) for p in people]
+    best_person = people[scores_list.index(max(scores_list))] if people else "—"
+    avg_score = sum(scores_list)/len(scores_list) if scores_list else 0
+
+    # Stat cards
+    cards_html = f"""
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem">
+      <div class="stat-card">
+        <div class="stat-icon">🏢</div>
+        <div class="stat-value" style="color:{score_color(emp)}">{emp:.1f}%</div>
+        <div class="stat-label">Score Empresa</div>
+        <div class="stat-sub">Promedio ponderado</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-value" style="color:#6366f1">{len(df)}</div>
+        <div class="stat-label">KPIs Total</div>
+        <div class="stat-sub">{len(df[df.tipo=="equipo"])} equipo · {len(df[df.tipo=="individual"])} individual</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏆</div>
+        <div class="stat-value" style="color:{score_color(max(scores_list) if scores_list else 0)}">{max(scores_list):.1f}%</div>
+        <div class="stat-label">Mejor Score</div>
+        <div class="stat-sub">{best_person.split()[0]}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value" style="color:{score_color(avg_score)}">{avg_score:.1f}%</div>
+        <div class="stat-label">Score Promedio</div>
+        <div class="stat-sub">{len(people)} personas</div>
+      </div>
+    </div>"""
+    st.markdown(cards_html, unsafe_allow_html=True)
+
+    col_obj, col_rank = st.columns([1.1, 1])
+
+    with col_obj:
+        rows_html = ""
         for proyecto, meta in PROJECT_META.items():
-            current = int(scores["empresa"].get(proyecto, 0))
-            new_val = st.slider(
-                f"**{proyecto}** — _{meta}_",
-                min_value=0, max_value=100, value=current,
-                key=f"emp__{proyecto}",
-                format="%d%%",
-            )
-            scores["empresa"][proyecto] = new_val
+            pct = st.session_state.scores["empresa"].get(proyecto, 0)
+            c = PROJECT_COLORS.get(proyecto, "#64748b")
+            c_rgb = f"{int(c[1:3],16)},{int(c[3:5],16)},{int(c[5:7],16)}"
+            rows_html += f"""
+            <div class="obj-row">
+              <span class="obj-proj-badge" style="background:rgba({c_rgb},0.15);color:{c}">{proyecto}</span>
+              <span class="obj-name">{meta}</span>
+              <span class="obj-pct" style="color:{score_color(pct)}">{pct}%</span>
+              <div class="obj-bar-wrap"><div class="obj-bar-fill" style="width:{pct}%;background:{score_color(pct)}"></div></div>
+            </div>"""
+        st.markdown(f'<div class="kpi-card"><div class="kpi-section-title">Objetivos de la empresa</div>{rows_html}</div>',
+                    unsafe_allow_html=True)
 
-    with col_resumen:
-        avg = calc_empresa(scores)
-        st.markdown("### Resumen")
-        st.metric("Score Empresa", f"{avg:.1f}%")
-        st.divider()
-        for proyecto in PROJECT_META:
-            v = scores["empresa"].get(proyecto, 0)
-            st.markdown(f"{semaforo(v)} **{proyecto}**: {v}%")
+    with col_rank:
+        sorted_people = sorted(zip(people, scores_list), key=lambda x: x[1], reverse=True)
+        rows_html = ""
+        for i, (persona, score) in enumerate(sorted_people):
+            ini = get_initials(persona)
+            ac  = get_avatar_color(persona)
+            c   = score_color(score)
+            rows_html += f"""
+            <div class="rank-row">
+              <span class="rank-num">#{i+1}</span>
+              <div class="avatar-sm" style="background:{ac}">{ini}</div>
+              <div class="rank-bar-wrap">
+                <div class="rank-bar-fill" style="width:{score:.1f}%;background:linear-gradient(90deg,{ac}88,{ac})">
+                  {persona.split()[0]}
+                </div>
+              </div>
+              <span class="rank-val" style="color:{c}">{score:.1f}%</span>
+            </div>"""
+        st.markdown(f'<div class="kpi-card"><div class="kpi-section-title">Ranking de personas</div>{rows_html}</div>',
+                    unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# VISTA: EQUIPO
-# ─────────────────────────────────────────────────────────────────────────────
-def view_equipo(df: pd.DataFrame, scores: dict):
-    st.header("👥 Meta Equipo (30%)")
-    st.markdown(
-        "KPIs con Responsable 2 o 3 asignado. "
-        "**Un solo % aplica igual para todos los responsables.**"
-    )
+# ─── VISTA: PERSONAS ──────────────────────────────────────────────────────────
+def view_personas(df):
+    people = all_people(df)
 
-    team_kpis = df[df["tipo"] == "equipo"].copy()
+    # Person selector
+    if "sel_persona" not in st.session_state:
+        st.session_state.sel_persona = people[0] if people else ""
 
+    pills_html = '<div class="pill-wrap">'
+    for p in people:
+        ini = get_initials(p)
+        ac  = get_avatar_color(p)
+        active = "active" if p == st.session_state.sel_persona else ""
+        pills_html += (f'<span class="pill {active}">'
+                       f'<span style="background:{ac};width:16px;height:16px;border-radius:50%;display:inline-flex;'
+                       f'align-items:center;justify-content:center;font-size:0.5rem;font-weight:700">{ini[0]}</span>'
+                       f'{p.split()[0]}</span>')
+    pills_html += '</div>'
+
+    # Use selectbox (styled) as actual selector
+    sel = st.selectbox("Persona", people,
+                       index=people.index(st.session_state.sel_persona) if st.session_state.sel_persona in people else 0,
+                       key="sel_persona_box", label_visibility="collapsed")
+    st.session_state.sel_persona = sel
+    persona = sel
+
+    st.markdown(pills_html, unsafe_allow_html=True)
+
+    # Scores
+    emp  = s_empresa()
+    equ  = s_equipo(persona, df)
+    ind  = s_individual(persona, df)
+    disc = s_disc(persona)
+    tot  = emp*0.30 + equ*0.30 + ind*0.30 + disc*0.10
+
+    # Person projects
+    person_projects = list(df[df["Responsable 1"]==persona]["Proyecto"].unique())
+    badges = "".join(project_badge_html(p) for p in person_projects)
+
+    # Role
+    lider_row = df[df["Responsable 1"]==persona]["Lider"]
+    lider = lider_row.iloc[0] if not lider_row.empty else ""
+    role = "Socio" if persona in SOCIOS else "Colaborador"
+
+    # Avatar
+    ini = get_initials(persona)
+    ac  = get_avatar_color(persona)
+
+    col_card, col_salarial = st.columns([1.4, 1])
+
+    with col_card:
+        # KPIs
+        ind_kpis  = df[(df["Responsable 1"]==persona) & (df["tipo"]=="individual")]
+        team_kpis = df[((df["Responsable 1"]==persona)|(df["Responsable 2"]==persona)|(df["Responsable 3"]==persona))
+                       & (df["tipo"]=="equipo")]
+
+        def kpi_rows_html(kpis, show_team=False):
+            html = ""
+            for _, row in kpis.iterrows():
+                uid  = row["uid"]
+                pct  = st.session_state.scores["kpis"].get(uid, 0)
+                c    = score_color(pct)
+                tipo = f'<span class="badge badge-{"equipo" if row["tipo"]=="equipo" else "ind"}">{"Equipo" if row["tipo"]=="equipo" else "Individual"}</span>'
+                rs   = [r for r in [row["Responsable 1"],row["Responsable 2"],row["Responsable 3"]] if r]
+                r_str = " · ".join(rs) if show_team and len(rs)>1 else ""
+                html += f"""
+                <div class="kpi-row">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div class="kpi-name">{row["KPI"]}</div>
+                    <div class="kpi-pct" style="color:{c}">{pct}%</div>
+                  </div>
+                  <div class="kpi-meta">{project_badge_html(row["Proyecto"])} {tipo}
+                    {f'<span style="color:#475569;font-size:0.68rem"> · {r_str}</span>' if r_str else ''}
+                    · 📅 {row["Fecha"]}
+                  </div>
+                  <div class="kpi-footer">
+                    {bar_html(pct, c)}
+                    {kpi_status_html(pct)}
+                  </div>
+                </div>"""
+            return html or '<div style="color:#475569;font-size:0.82rem;padding:10px 0">Sin KPIs asignados</div>'
+
+        card_html = f"""
+        <div class="kpi-card">
+          <div class="person-header">
+            <div class="avatar" style="background:{ac}">{ini}</div>
+            <div class="person-info">
+              <div class="person-name">{persona}</div>
+              <div class="person-role">{role}{f" — {lider.split()[0]+' '+lider.split()[1] if lider and lider not in SOCIOS else ''}" if lider and lider != persona else ""}</div>
+              <div>{badges}</div>
+            </div>
+            <div class="person-score-big" style="color:{score_color(tot)}">{tot:.1f}%</div>
+          </div>
+          <div class="kpi-section-title">Objetivos Individuales · {len(ind_kpis)} KPIs</div>
+          {kpi_rows_html(ind_kpis)}
+          <div class="kpi-section-title">Objetivos Equipo · {len(team_kpis)} KPIs</div>
+          {kpi_rows_html(team_kpis, show_team=True)}
+        </div>"""
+        st.markdown(card_html, unsafe_allow_html=True)
+
+    with col_salarial:
+        def score_box(label, pct, weight):
+            c   = score_color(pct)
+            pts = pct * weight / 100
+            return f"""
+            <div class="score-box">
+              <div class="score-box-label">{label}</div>
+              <div class="score-box-value" style="color:{c}">{pct:.1f}%</div>
+              <div class="score-box-bar"><div style="width:{min(pct,100)}%;height:100%;background:{c};border-radius:2px"></div></div>
+              <div class="score-box-sub">Aporta {pts:.1f}pts</div>
+            </div>"""
+
+        tc = score_color(tot)
+        salarial_html = f"""
+        <div class="kpi-card">
+          <div class="kpi-section-title">Desglose Variable Salarial</div>
+          <div class="score-grid">
+            {score_box("Empresa (30%)", emp, 30)}
+            {score_box("Equipo (30%)", equ, 30)}
+            {score_box("Individual (30%)", ind, 30)}
+            {score_box("Socios (10%)", disc, 10)}
+          </div>
+          <div class="total-box">
+            <div class="total-label">Score Total Ponderado</div>
+            <div class="total-value" style="color:{tc}">{tot:.1f}%</div>
+          </div>
+        </div>"""
+        st.markdown(salarial_html, unsafe_allow_html=True)
+
+
+# ─── VISTA: EQUIPOS ───────────────────────────────────────────────────────────
+def view_equipos(df):
+    team_kpis = df[df["tipo"]=="equipo"].copy()
     proyectos = ["Todos"] + sorted(team_kpis["Proyecto"].unique().tolist())
-    filtro = st.selectbox("Filtrar por proyecto", proyectos, key="eq_filtro")
-    if filtro != "Todos":
-        team_kpis = team_kpis[team_kpis["Proyecto"] == filtro]
-
-    st.divider()
+    filtro = st.selectbox("Proyecto", proyectos, key="eq_f")
+    if filtro != "Todos": team_kpis = team_kpis[team_kpis["Proyecto"]==filtro]
 
     for proyecto in sorted(team_kpis["Proyecto"].unique()):
-        with st.expander(f"📁 {proyecto}", expanded=True):
-            for _, row in team_kpis[team_kpis["Proyecto"] == proyecto].iterrows():
-                uid = row["uid"]
-                current = int(scores["kpis"].get(uid, 0))
-                responsables = " · ".join([r for r in [row["Responsable 1"], row["Responsable 2"], row["Responsable 3"]] if r])
-
-                c1, c2 = st.columns([4, 1])
-                with c1:
-                    st.markdown(
-                        f"<div class='kpi-row'><b>{row['KPI']}</b><br>"
-                        f"<small style='color:#6b7280'>Obj: {row['Objetivo Lider']} &nbsp;|&nbsp; "
-                        f"👥 {responsables} &nbsp;|&nbsp; 📅 {row['Fecha']}</small></div>",
-                        unsafe_allow_html=True,
-                    )
-                with c2:
-                    new_val = st.number_input(
-                        "%", min_value=0, max_value=100, value=current,
-                        key=f"kpi__{uid}", label_visibility="collapsed",
-                    )
-                    scores["kpis"][uid] = new_val
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# VISTA: INDIVIDUAL
-# ─────────────────────────────────────────────────────────────────────────────
-def view_individual(df: pd.DataFrame, scores: dict):
-    st.header("👤 Meta Individual (30%)")
-
-    persona = st.selectbox("Seleccionar persona", all_people(df), key="ind_persona")
-    if not persona:
-        return
-
-    ind_kpis  = df[(df["Responsable 1"] == persona) & (df["tipo"] == "individual")]
-    team_kpis = df[
-        ((df["Responsable 1"] == persona) | (df["Responsable 2"] == persona) | (df["Responsable 3"] == persona))
-        & (df["tipo"] == "equipo")
-    ]
-
-    emp = calc_empresa(scores)
-    equ = calc_equipo(persona, df, scores)
-    ind = calc_individual(persona, df, scores)
-    disc = calc_disc_pct(persona, scores)
-    total = emp * 0.30 + equ * 0.30 + ind * 0.30 + disc * 0.10
-
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Empresa (30%)",      f"{emp:.1f}%")
-    m2.metric("Equipo (30%)",       f"{equ:.1f}%")
-    m3.metric("Individual (30%)",   f"{ind:.1f}%")
-    m4.metric("Discrecional (10%)", f"{disc:.1f}%")
-    m5.metric("TOTAL",              f"{total:.1f}%")
-
-    st.divider()
-    col_ind, col_eq = st.columns(2)
-
-    with col_ind:
-        st.markdown(f"### KPIs Individuales ({len(ind_kpis)})")
-        if ind_kpis.empty:
-            st.info("Sin KPIs individuales asignados.")
-        else:
-            for _, row in ind_kpis.iterrows():
-                uid = row["uid"]
-                current = int(scores["kpis"].get(uid, 0))
-                c1, c2 = st.columns([4, 1])
-                with c1:
-                    st.markdown(
-                        f"<div class='kpi-row'><b>{row['KPI']}</b><br>"
-                        f"<small style='color:#6b7280'>{row['Proyecto']} — {row['Objetivo Lider']} | 📅 {row['Fecha']}</small></div>",
-                        unsafe_allow_html=True,
-                    )
-                with c2:
-                    new_val = st.number_input(
-                        "%", min_value=0, max_value=100, value=current,
-                        key=f"ind__{uid}", label_visibility="collapsed",
-                    )
-                    scores["kpis"][uid] = new_val
-        st.metric("Score Individual", f"{ind:.1f}%")
-
-    with col_eq:
-        st.markdown(f"### KPIs de Equipo ({len(team_kpis)})")
-        if team_kpis.empty:
-            st.info("Sin KPIs de equipo.")
-        else:
-            for _, row in team_kpis.iterrows():
-                uid = row["uid"]
-                kpi_score = scores["kpis"].get(uid, 0)
-                responsables = " · ".join([r for r in [row["Responsable 1"], row["Responsable 2"], row["Responsable 3"]] if r])
-                st.markdown(
-                    f"<div class='kpi-row'><b>{row['KPI']}</b> &nbsp; {pill(kpi_score)}<br>"
-                    f"<small style='color:#6b7280'>{row['Proyecto']} | 👥 {responsables} | 📅 {row['Fecha']}</small></div>",
-                    unsafe_allow_html=True,
-                )
-        st.metric("Score Equipo", f"{equ:.1f}%")
+        pc   = PROJECT_COLORS.get(proyecto,"#64748b")
+        rows = team_kpis[team_kpis["Proyecto"]==proyecto]
+        rows_html = ""
+        for _, row in rows.iterrows():
+            pct  = st.session_state.scores["kpis"].get(row["uid"], 0)
+            c    = score_color(pct)
+            rs   = [r for r in [row["Responsable 1"],row["Responsable 2"],row["Responsable 3"]] if r]
+            rows_html += f"""
+            <div class="kpi-row">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div class="kpi-name">{row["KPI"]}</div>
+                <div class="kpi-pct" style="color:{c}">{pct}%</div>
+              </div>
+              <div class="kpi-meta">{'  ·  '.join(f'<span style="color:#94a3b8">{r}</span>' for r in rs)} · 📅 {row["Fecha"]}</div>
+              <div class="kpi-footer">{bar_html(pct, c)}{kpi_status_html(pct)}</div>
+            </div>"""
+        c_rgb = f"{int(pc[1:3],16)},{int(pc[3:5],16)},{int(pc[5:7],16)}"
+        st.markdown(
+            f'<div class="kpi-card">'
+            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+            f'<span style="background:rgba({c_rgb},0.2);color:{pc};padding:3px 10px;border-radius:6px;font-weight:700;font-size:0.8rem">{proyecto}</span>'
+            f'<span style="color:#64748b;font-size:0.75rem">{len(rows)} KPIs de equipo</span></div>'
+            f'{rows_html}</div>', unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# VISTA: VARIABLE SALARIAL
-# ─────────────────────────────────────────────────────────────────────────────
-def view_variable_salarial(df: pd.DataFrame, scores: dict):
-    st.header("💰 Variable Salarial")
-    st.markdown("**Score Total = (Empresa × 30%) + (Equipo × 30%) + (Individual × 30%) + (Discrecional × 10%)**")
+# ─── VISTA: VARIABLE SALARIAL ─────────────────────────────────────────────────
+def view_variable_salarial(df):
+    emp_score = s_empresa()
+    people    = all_people(df)
 
-    with st.expander("⚙️ Calificación Discrecional (escala 0 – 10)", expanded=False):
-        st.markdown("Cada líder asigna un valor de **0 a 10** a cada persona de su equipo.")
+    rows_data = []
+    for p in people:
+        equ  = s_equipo(p, df)
+        ind  = s_individual(p, df)
+        disc = s_disc(p)
+        tot  = emp_score*0.30 + equ*0.30 + ind*0.30 + disc*0.10
+        lider_v = df[df["Responsable 1"]==p]["Lider"]
+        rows_data.append((p, lider_v.iloc[0] if not lider_v.empty else "—",
+                          emp_score, equ, ind, disc, tot))
+
+    rows_data.sort(key=lambda x: x[6], reverse=True)
+
+    # Ranking bars
+    rank_html = ""
+    for i, (p, lider, emp, equ, ind, disc, tot) in enumerate(rows_data):
+        ini = get_initials(p); ac = get_avatar_color(p); c = score_color(tot)
+        rank_html += f"""
+        <div class="rank-row">
+          <span class="rank-num">#{i+1}</span>
+          <div class="avatar-sm" style="background:{ac}">{ini}</div>
+          <span style="min-width:140px;font-size:0.82rem;color:#e2e8f0">{p.split()[0]} {p.split()[-1]}</span>
+          <div class="rank-bar-wrap" style="height:22px">
+            <div class="rank-bar-fill" style="width:{tot:.1f}%;background:linear-gradient(90deg,{ac}88,{ac});font-size:0.72rem">
+              {tot:.1f}%
+            </div>
+          </div>
+          <span class="rank-val" style="color:{c}">{tot:.1f}%</span>
+        </div>"""
+
+    # Table
+    header = ('<div style="display:grid;grid-template-columns:160px 100px repeat(4,80px) 80px;gap:8px;'
+              'padding:6px 0;border-bottom:1px solid #334155;font-size:0.68rem;font-weight:600;color:#64748b;text-transform:uppercase">'
+              '<span>Persona</span><span>Lider</span><span>Empresa</span><span>Equipo</span>'
+              '<span>Indiv.</span><span>Disc.</span><span style="color:#6366f1">Total</span></div>')
+    table_rows = ""
+    for p, lider, emp, equ, ind, disc, tot in rows_data:
+        c = score_color(tot)
+        table_rows += (f'<div style="display:grid;grid-template-columns:160px 100px repeat(4,80px) 80px;gap:8px;'
+                       f'padding:8px 0;border-bottom:1px solid #1a2540;font-size:0.82rem;align-items:center">'
+                       f'<span style="color:#e2e8f0;font-weight:500">{p.split()[0]} {p.split()[-1]}</span>'
+                       f'<span style="color:#64748b">{lider.split()[0] if lider != "—" else "—"}</span>'
+                       f'<span style="color:{score_color(emp)}">{emp:.1f}%</span>'
+                       f'<span style="color:{score_color(equ)}">{equ:.1f}%</span>'
+                       f'<span style="color:{score_color(ind)}">{ind:.1f}%</span>'
+                       f'<span style="color:{score_color(disc)}">{disc:.1f}%</span>'
+                       f'<span style="color:{c};font-weight:700">{tot:.1f}%</span>'
+                       f'</div>')
+
+    col1, col2 = st.columns([1, 1.2])
+    with col1:
+        st.markdown(f'<div class="kpi-card"><div class="kpi-section-title">Ranking</div>{rank_html}</div>',
+                    unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<div class="kpi-card"><div class="kpi-section-title">Detalle completo</div>{header}{table_rows}</div>',
+                    unsafe_allow_html=True)
+
+
+# ─── VISTA: EDITOR ────────────────────────────────────────────────────────────
+def view_editor(df):
+    st.markdown('<div style="color:#94a3b8;font-size:0.85rem;margin-bottom:1rem">Ingresa los porcentajes de cumplimiento. Presiona <b style="color:#6366f1">Guardar</b> cuando termines.</div>',
+                unsafe_allow_html=True)
+
+    tab_emp, tab_kpis, tab_disc = st.tabs(["📊 Empresa", "📋 KPIs", "⭐ Discrecional"])
+
+    with tab_emp:
+        st.markdown("#### Calificación por proyecto")
+        for proyecto in PROJECT_META:
+            current = int(st.session_state.scores["empresa"].get(proyecto, 0))
+            v = st.slider(f"{proyecto}", 0, 100, current, format="%d%%", key=f"ed_emp__{proyecto}")
+            st.session_state.scores["empresa"][proyecto] = v
+
+    with tab_kpis:
+        filtro_p = st.selectbox("Proyecto", ["Todos"] + sorted(df["Proyecto"].unique().tolist()), key="ed_proy")
+        filtro_t = st.selectbox("Tipo", ["Todos", "equipo", "individual"], key="ed_tipo")
+        show_df  = df.copy()
+        if filtro_p != "Todos": show_df = show_df[show_df["Proyecto"]==filtro_p]
+        if filtro_t != "Todos": show_df = show_df[show_df["tipo"]==filtro_t]
+
+        for _, row in show_df.iterrows():
+            uid     = row["uid"]
+            current = int(st.session_state.scores["kpis"].get(uid, 0))
+            rs      = [r for r in [row["Responsable 1"],row["Responsable 2"],row["Responsable 3"]] if r]
+            label   = f"**{row['KPI']}** — {row['Proyecto']} · {', '.join(rs)}"
+            v = st.number_input(label, 0, 100, current, key=f"ed_kpi__{uid}")
+            st.session_state.scores["kpis"][uid] = v
+
+    with tab_disc:
+        st.markdown("#### Calificación discrecional (0 – 10)")
         cols = st.columns(3)
         for i, socio in enumerate(SOCIOS):
             with cols[i]:
-                st.markdown(f"**{socio.split()[0]}**")
+                st.markdown(f"**{socio.split()[0]} {socio.split()[1]}**")
                 equipo = [p for p in people_by_lider(df, socio) if p not in SOCIOS]
                 for persona in equipo:
-                    current = int(scores.get("discrecional", {}).get(persona, 0))
-                    new_val = st.number_input(
-                        persona, min_value=0, max_value=10, value=current,
-                        key=f"disc__{persona}",
-                    )
-                    scores.setdefault("discrecional", {})[persona] = new_val
+                    current = int(st.session_state.scores.get("discrecional",{}).get(persona, 0))
+                    v = st.number_input(persona.split()[0], 0, 10, current, key=f"ed_disc__{persona}")
+                    st.session_state.scores.setdefault("discrecional",{})[persona] = v
 
-    st.divider()
-
-    personas  = all_people(df)
-    emp_score = calc_empresa(scores)
-
-    rows = []
-    for persona in personas:
-        equ   = calc_equipo(persona, df, scores)
-        ind   = calc_individual(persona, df, scores)
-        disc  = calc_disc_pct(persona, scores)
-        total = emp_score * 0.30 + equ * 0.30 + ind * 0.30 + disc * 0.10
-        lider_vals = df[df["Responsable 1"] == persona]["Lider"]
-        lider = lider_vals.iloc[0] if not lider_vals.empty else "—"
-        rows.append({
-            "Persona":            persona,
-            "Lider":              lider,
-            "Empresa (30%)":      round(emp_score, 1),
-            "Equipo (30%)":       round(equ, 1),
-            "Individual (30%)":   round(ind, 1),
-            "Discrecional (10%)": round(disc, 1),
-            "TOTAL":              round(total, 1),
-        })
-
-    result_df = pd.DataFrame(rows).sort_values("TOTAL", ascending=False)
-
-    def highlight_total(val):
-        if val >= 80:   return "background-color:#d1fae5;color:#065f46;font-weight:bold"
-        if val >= 60:   return "background-color:#fef9c3;color:#713f12;font-weight:bold"
-        return "background-color:#fee2e2;color:#7f1d1d;font-weight:bold"
-
-    styled = result_df.style.applymap(highlight_total, subset=["TOTAL"]).format({
-        "Empresa (30%)": "{:.1f}%", "Equipo (30%)": "{:.1f}%",
-        "Individual (30%)": "{:.1f}%", "Discrecional (10%)": "{:.1f}%", "TOTAL": "{:.1f}%",
-    })
-    st.dataframe(styled, use_container_width=True, hide_index=True)
-    st.markdown(f"**Score Empresa compartido:** {emp_score:.1f}%")
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("💾 Guardar todos los cambios", type="primary", use_container_width=True):
+        with st.spinner("Guardando en GitHub…"):
+            save_scores()
+        st.success("✅ Cambios guardados correctamente")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# VISTA: ADMIN
-# ─────────────────────────────────────────────────────────────────────────────
-def view_admin(df: pd.DataFrame, scores: dict):
-    st.header("⚙️ Admin — Vista de datos")
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total KPIs", len(df))
-    c2.metric("KPIs Equipo", len(df[df["tipo"] == "equipo"]))
-    c3.metric("KPIs Individual", len(df[df["tipo"] == "individual"]))
-
-    st.divider()
-    tipo_f    = st.selectbox("Tipo",    ["Todos", "equipo", "individual"], key="adm_tipo")
-    proy_f    = st.selectbox("Proyecto", ["Todos"] + sorted(df["Proyecto"].unique().tolist()), key="adm_proy")
-    persona_f = st.selectbox("Persona (R1/R2/R3)", ["Todos"] + all_people(df), key="adm_persona")
-
-    display = df.copy()
-    if tipo_f    != "Todos": display = display[display["tipo"] == tipo_f]
-    if proy_f    != "Todos": display = display[display["Proyecto"] == proy_f]
-    if persona_f != "Todos":
-        display = display[
-            (display["Responsable 1"] == persona_f) |
-            (display["Responsable 2"] == persona_f) |
-            (display["Responsable 3"] == persona_f)
-        ]
-
-    display = display.copy()
-    display["Score"] = display["uid"].map(lambda u: f"{scores['kpis'].get(u, 0)}%")
-
-    show_cols = ["Proyecto","KPI","Objetivo Lider","Responsable 1","Responsable 2","Responsable 3","Lider","tipo","Fecha","Score"]
-    st.dataframe(display[[c for c in show_cols if c in display.columns]], use_container_width=True, hide_index=True)
-
-    st.divider()
-    if st.button("🗑 Resetear TODOS los scores", type="secondary"):
-        for uid in scores["kpis"]:    scores["kpis"][uid] = 0
-        for p in scores["empresa"]:   scores["empresa"][p] = 0
-        scores["discrecional"] = {}
-        save_scores(scores)
-        st.rerun()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
     df = load_data()
-
     if "scores" not in st.session_state:
         init_scores(df)
 
-    scores = st.session_state.scores
+    render_header()
 
-    with st.sidebar:
-        st.title("🏢 PISO KPIs Q2 2026")
-        st.divider()
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        ["📊 Resumen", "👤 Personas", "👥 Equipos", "💰 Variable Salarial", "✏️ Editor"])
 
-        vista = st.radio(
-            "Navegación",
-            ["📊 Empresa", "👥 Equipo", "👤 Individual", "💰 Variable Salarial", "⚙️ Admin"],
-            label_visibility="collapsed",
-        )
-
-        st.divider()
-        avg_emp = calc_empresa(scores)
-        st.metric("Score Empresa", f"{avg_emp:.1f}%")
-        st.divider()
-
-        if st.button("💾 Guardar cambios", type="primary", use_container_width=True):
-            with st.spinner("Guardando…"):
-                save_scores(scores)
-            st.success("✅ Guardado")
-
-        st.caption("Cambios guardados en GitHub — accesibles desde cualquier dispositivo.")
-
-    if vista == "📊 Empresa":
-        view_empresa(scores)
-    elif vista == "👥 Equipo":
-        view_equipo(df, scores)
-    elif vista == "👤 Individual":
-        view_individual(df, scores)
-    elif vista == "💰 Variable Salarial":
-        view_variable_salarial(df, scores)
-    elif vista == "⚙️ Admin":
-        view_admin(df, scores)
-
+    with tab1: view_resumen(df)
+    with tab2: view_personas(df)
+    with tab3: view_equipos(df)
+    with tab4: view_variable_salarial(df)
+    with tab5: view_editor(df)
 
 if __name__ == "__main__":
     main()

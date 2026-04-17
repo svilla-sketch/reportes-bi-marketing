@@ -437,33 +437,24 @@ def view_resumen(df):
     avg_score = sum(scores_list)/len(scores_list) if scores_list else 0
 
     # Stat cards
-    cards_html = f"""
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem">
-      <div class="stat-card">
-        <div class="stat-icon">🏢</div>
-        <div class="stat-value" style="color:{score_color(emp)}">{emp:.1f}%</div>
-        <div class="stat-label">Score Empresa</div>
-        <div class="stat-sub">Promedio ponderado</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📋</div>
-        <div class="stat-value" style="color:#6366f1">{len(df)}</div>
-        <div class="stat-label">KPIs Total</div>
-        <div class="stat-sub">{len(df[df.tipo=="equipo"])} equipo · {len(df[df.tipo=="individual"])} individual</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🏆</div>
-        <div class="stat-value" style="color:{score_color(max(scores_list) if scores_list else 0)}">{max(scores_list):.1f}%</div>
-        <div class="stat-label">Mejor Score</div>
-        <div class="stat-sub">{best_person.split()[0]}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-value" style="color:{score_color(avg_score)}">{avg_score:.1f}%</div>
-        <div class="stat-label">Score Promedio</div>
-        <div class="stat-sub">{len(people)} personas</div>
-      </div>
-    </div>"""
+    max_score = max(scores_list) if scores_list else 0
+    n_eq = len(df[df.tipo == "equipo"]); n_ind = len(df[df.tipo == "individual"])
+    cards_html = (
+        f'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem">'
+        f'<div class="stat-card"><div class="stat-icon">🏢</div>'
+        f'<div class="stat-value" style="color:{score_color(emp)}">{emp:.1f}%</div>'
+        f'<div class="stat-label">Score Empresa</div><div class="stat-sub">Promedio ponderado</div></div>'
+        f'<div class="stat-card"><div class="stat-icon">📋</div>'
+        f'<div class="stat-value" style="color:#6366f1">{len(df)}</div>'
+        f'<div class="stat-label">KPIs Total</div><div class="stat-sub">{n_eq} equipo · {n_ind} individual</div></div>'
+        f'<div class="stat-card"><div class="stat-icon">🏆</div>'
+        f'<div class="stat-value" style="color:{score_color(max_score)}">{max_score:.1f}%</div>'
+        f'<div class="stat-label">Mejor Score</div><div class="stat-sub">{best_person.split()[0]}</div></div>'
+        f'<div class="stat-card"><div class="stat-icon">📊</div>'
+        f'<div class="stat-value" style="color:{score_color(avg_score)}">{avg_score:.1f}%</div>'
+        f'<div class="stat-label">Score Promedio</div><div class="stat-sub">{len(people)} personas</div></div>'
+        f'</div>'
+    )
     st.markdown(cards_html, unsafe_allow_html=True)
 
     col_obj, col_rank = st.columns([1.1, 1])
@@ -471,16 +462,17 @@ def view_resumen(df):
     with col_obj:
         rows_html = ""
         for proyecto, meta in PROJECT_META.items():
-            pct = st.session_state.scores["empresa"].get(proyecto, 0)
-            c = PROJECT_COLORS.get(proyecto, "#64748b")
+            pct   = st.session_state.scores["empresa"].get(proyecto, 0)
+            c     = PROJECT_COLORS.get(proyecto, "#64748b")
             c_rgb = f"{int(c[1:3],16)},{int(c[3:5],16)},{int(c[5:7],16)}"
-            rows_html += f"""
-            <div class="obj-row">
-              <span class="obj-proj-badge" style="background:rgba({c_rgb},0.15);color:{c}">{proyecto}</span>
-              <span class="obj-name">{meta}</span>
-              <span class="obj-pct" style="color:{score_color(pct)}">{pct}%</span>
-              <div class="obj-bar-wrap"><div class="obj-bar-fill" style="width:{pct}%;background:{score_color(pct)}"></div></div>
-            </div>"""
+            rows_html += (
+                f'<div class="obj-row">'
+                f'<span class="obj-proj-badge" style="background:rgba({c_rgb},0.15);color:{c}">{proyecto}</span>'
+                f'<span class="obj-name">{meta}</span>'
+                f'<span class="obj-pct" style="color:{score_color(pct)}">{pct}%</span>'
+                f'<div class="obj-bar-wrap"><div class="obj-bar-fill" style="width:{pct}%;background:{score_color(pct)}"></div></div>'
+                f'</div>'
+            )
         st.markdown(f'<div class="kpi-card"><div class="kpi-section-title">Objetivos de la empresa</div>{rows_html}</div>',
                     unsafe_allow_html=True)
 
@@ -491,17 +483,17 @@ def view_resumen(df):
             ini = get_initials(persona)
             ac  = get_avatar_color(persona)
             c   = score_color(score)
-            rows_html += f"""
-            <div class="rank-row">
-              <span class="rank-num">#{i+1}</span>
-              <div class="avatar-sm" style="background:{ac}">{ini}</div>
-              <div class="rank-bar-wrap">
-                <div class="rank-bar-fill" style="width:{score:.1f}%;background:linear-gradient(90deg,{ac}88,{ac})">
-                  {persona.split()[0]}
-                </div>
-              </div>
-              <span class="rank-val" style="color:{c}">{score:.1f}%</span>
-            </div>"""
+            rows_html += (
+                f'<div class="rank-row">'
+                f'<span class="rank-num">#{i+1}</span>'
+                f'<div class="avatar-sm" style="background:{ac}">{ini}</div>'
+                f'<div class="rank-bar-wrap">'
+                f'<div class="rank-bar-fill" style="width:{score:.1f}%;background:linear-gradient(90deg,{ac}88,{ac})">'
+                f'{persona.split()[0]}'
+                f'</div></div>'
+                f'<span class="rank-val" style="color:{c}">{score:.1f}%</span>'
+                f'</div>'
+            )
         st.markdown(f'<div class="kpi-card"><div class="kpi-section-title">Ranking de personas</div>{rows_html}</div>',
                     unsafe_allow_html=True)
 
@@ -565,74 +557,79 @@ def view_personas(df):
         def kpi_rows_html(kpis, show_team=False):
             html = ""
             for _, row in kpis.iterrows():
-                uid  = row["uid"]
-                pct  = st.session_state.scores["kpis"].get(uid, 0)
-                c    = score_color(pct)
-                tipo = f'<span class="badge badge-{"equipo" if row["tipo"]=="equipo" else "ind"}">{"Equipo" if row["tipo"]=="equipo" else "Individual"}</span>'
-                rs   = [r for r in [row["Responsable 1"],row["Responsable 2"],row["Responsable 3"]] if r]
-                r_str = " · ".join(rs) if show_team and len(rs)>1 else ""
-                html += f"""
-                <div class="kpi-row">
-                  <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                    <div class="kpi-name">{row["KPI"]}</div>
-                    <div class="kpi-pct" style="color:{c}">{pct}%</div>
-                  </div>
-                  <div class="kpi-meta">{project_badge_html(row["Proyecto"])} {tipo}
-                    {f'<span style="color:#475569;font-size:0.68rem"> · {r_str}</span>' if r_str else ''}
-                    · 📅 {row["Fecha"]}
-                  </div>
-                  <div class="kpi-footer">
-                    {bar_html(pct, c)}
-                    {kpi_status_html(pct)}
-                  </div>
-                </div>"""
+                uid   = row["uid"]
+                pct   = st.session_state.scores["kpis"].get(uid, 0)
+                c     = score_color(pct)
+                badge_cls = "equipo" if row["tipo"] == "equipo" else "ind"
+                badge_lbl = "Equipo" if row["tipo"] == "equipo" else "Individual"
+                tipo  = f'<span class="badge badge-{badge_cls}">{badge_lbl}</span>'
+                rs    = [r for r in [row["Responsable 1"], row["Responsable 2"], row["Responsable 3"]] if r]
+                r_str = " · ".join(rs) if show_team and len(rs) > 1 else ""
+                rspan = f'<span style="color:#475569;font-size:0.68rem"> · {r_str}</span>' if r_str else ""
+                html += (
+                    f'<div class="kpi-row">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+                    f'<div class="kpi-name">{row["KPI"]}</div>'
+                    f'<div class="kpi-pct" style="color:{c}">{pct}%</div>'
+                    f'</div>'
+                    f'<div class="kpi-meta">{project_badge_html(row["Proyecto"])} {tipo}{rspan} · 📅 {row["Fecha"]}</div>'
+                    f'<div class="kpi-footer">{bar_html(pct, c)}{kpi_status_html(pct)}</div>'
+                    f'</div>'
+                )
             return html or '<div style="color:#475569;font-size:0.82rem;padding:10px 0">Sin KPIs asignados</div>'
 
-        card_html = f"""
-        <div class="kpi-card">
-          <div class="person-header">
-            <div class="avatar" style="background:{ac}">{ini}</div>
-            <div class="person-info">
-              <div class="person-name">{persona}</div>
-              <div class="person-role">{role}{f" — {lider.split()[0]+' '+lider.split()[1] if lider and lider not in SOCIOS else ''}" if lider and lider != persona else ""}</div>
-              <div>{badges}</div>
-            </div>
-            <div class="person-score-big" style="color:{score_color(tot)}">{tot:.1f}%</div>
-          </div>
-          <div class="kpi-section-title">Objetivos Individuales · {len(ind_kpis)} KPIs</div>
-          {kpi_rows_html(ind_kpis)}
-          <div class="kpi-section-title">Objetivos Equipo · {len(team_kpis)} KPIs</div>
-          {kpi_rows_html(team_kpis, show_team=True)}
-        </div>"""
+        lider_display = ""
+        if lider and lider != persona and lider not in SOCIOS:
+            parts = lider.split()
+            lider_display = f" — {parts[0]} {parts[1]}" if len(parts) >= 2 else f" — {lider}"
+        card_html = (
+            f'<div class="kpi-card">'
+            f'<div class="person-header">'
+            f'<div class="avatar" style="background:{ac}">{ini}</div>'
+            f'<div class="person-info">'
+            f'<div class="person-name">{persona}</div>'
+            f'<div class="person-role">{role}{lider_display}</div>'
+            f'<div>{badges}</div>'
+            f'</div>'
+            f'<div class="person-score-big" style="color:{score_color(tot)}">{tot:.1f}%</div>'
+            f'</div>'
+            f'<div class="kpi-section-title">Objetivos Individuales · {len(ind_kpis)} KPIs</div>'
+            f'{kpi_rows_html(ind_kpis)}'
+            f'<div class="kpi-section-title">Objetivos Equipo · {len(team_kpis)} KPIs</div>'
+            f'{kpi_rows_html(team_kpis, show_team=True)}'
+            f'</div>'
+        )
         st.markdown(card_html, unsafe_allow_html=True)
 
     with col_salarial:
         def score_box(label, pct, weight):
             c   = score_color(pct)
             pts = pct * weight / 100
-            return f"""
-            <div class="score-box">
-              <div class="score-box-label">{label}</div>
-              <div class="score-box-value" style="color:{c}">{pct:.1f}%</div>
-              <div class="score-box-bar"><div style="width:{min(pct,100)}%;height:100%;background:{c};border-radius:2px"></div></div>
-              <div class="score-box-sub">Aporta {pts:.1f}pts</div>
-            </div>"""
+            return (
+                f'<div class="score-box">'
+                f'<div class="score-box-label">{label}</div>'
+                f'<div class="score-box-value" style="color:{c}">{pct:.1f}%</div>'
+                f'<div class="score-box-bar"><div style="width:{min(pct,100)}%;height:100%;background:{c};border-radius:2px"></div></div>'
+                f'<div class="score-box-sub">Aporta {pts:.1f}pts</div>'
+                f'</div>'
+            )
 
         tc = score_color(tot)
-        salarial_html = f"""
-        <div class="kpi-card">
-          <div class="kpi-section-title">Desglose Variable Salarial</div>
-          <div class="score-grid">
-            {score_box("Empresa (30%)", emp, 30)}
-            {score_box("Equipo (30%)", equ, 30)}
-            {score_box("Individual (30%)", ind, 30)}
-            {score_box("Socios (10%)", disc, 10)}
-          </div>
-          <div class="total-box">
-            <div class="total-label">Score Total Ponderado</div>
-            <div class="total-value" style="color:{tc}">{tot:.1f}%</div>
-          </div>
-        </div>"""
+        salarial_html = (
+            f'<div class="kpi-card">'
+            f'<div class="kpi-section-title">Desglose Variable Salarial</div>'
+            f'<div class="score-grid">'
+            f'{score_box("Empresa (30%)", emp, 30)}'
+            f'{score_box("Equipo (30%)", equ, 30)}'
+            f'{score_box("Individual (30%)", ind, 30)}'
+            f'{score_box("Socios (10%)", disc, 10)}'
+            f'</div>'
+            f'<div class="total-box">'
+            f'<div class="total-label">Score Total Ponderado</div>'
+            f'<div class="total-value" style="color:{tc}">{tot:.1f}%</div>'
+            f'</div>'
+            f'</div>'
+        )
         st.markdown(salarial_html, unsafe_allow_html=True)
 
 
@@ -651,15 +648,17 @@ def view_equipos(df):
             pct  = st.session_state.scores["kpis"].get(row["uid"], 0)
             c    = score_color(pct)
             rs   = [r for r in [row["Responsable 1"],row["Responsable 2"],row["Responsable 3"]] if r]
-            rows_html += f"""
-            <div class="kpi-row">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                <div class="kpi-name">{row["KPI"]}</div>
-                <div class="kpi-pct" style="color:{c}">{pct}%</div>
-              </div>
-              <div class="kpi-meta">{'  ·  '.join(f'<span style="color:#94a3b8">{r}</span>' for r in rs)} · 📅 {row["Fecha"]}</div>
-              <div class="kpi-footer">{bar_html(pct, c)}{kpi_status_html(pct)}</div>
-            </div>"""
+            resp_str = "  ·  ".join(f'<span style="color:#94a3b8">{r}</span>' for r in rs)
+            rows_html += (
+                f'<div class="kpi-row">'
+                f'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+                f'<div class="kpi-name">{row["KPI"]}</div>'
+                f'<div class="kpi-pct" style="color:{c}">{pct}%</div>'
+                f'</div>'
+                f'<div class="kpi-meta">{resp_str} · 📅 {row["Fecha"]}</div>'
+                f'<div class="kpi-footer">{bar_html(pct, c)}{kpi_status_html(pct)}</div>'
+                f'</div>'
+            )
         c_rgb = f"{int(pc[1:3],16)},{int(pc[3:5],16)},{int(pc[5:7],16)}"
         st.markdown(
             f'<div class="kpi-card">'
@@ -690,18 +689,17 @@ def view_variable_salarial(df):
     rank_html = ""
     for i, (p, lider, emp, equ, ind, disc, tot) in enumerate(rows_data):
         ini = get_initials(p); ac = get_avatar_color(p); c = score_color(tot)
-        rank_html += f"""
-        <div class="rank-row">
-          <span class="rank-num">#{i+1}</span>
-          <div class="avatar-sm" style="background:{ac}">{ini}</div>
-          <span style="min-width:140px;font-size:0.82rem;color:#e2e8f0">{p.split()[0]} {p.split()[-1]}</span>
-          <div class="rank-bar-wrap" style="height:22px">
-            <div class="rank-bar-fill" style="width:{tot:.1f}%;background:linear-gradient(90deg,{ac}88,{ac});font-size:0.72rem">
-              {tot:.1f}%
-            </div>
-          </div>
-          <span class="rank-val" style="color:{c}">{tot:.1f}%</span>
-        </div>"""
+        rank_html += (
+            f'<div class="rank-row">'
+            f'<span class="rank-num">#{i+1}</span>'
+            f'<div class="avatar-sm" style="background:{ac}">{ini}</div>'
+            f'<span style="min-width:140px;font-size:0.82rem;color:#e2e8f0">{p.split()[0]} {p.split()[-1]}</span>'
+            f'<div class="rank-bar-wrap" style="height:22px">'
+            f'<div class="rank-bar-fill" style="width:{tot:.1f}%;background:linear-gradient(90deg,{ac}88,{ac});font-size:0.72rem">'
+            f'{tot:.1f}%</div></div>'
+            f'<span class="rank-val" style="color:{c}">{tot:.1f}%</span>'
+            f'</div>'
+        )
 
     # Table
     header = ('<div style="display:grid;grid-template-columns:160px 100px repeat(4,80px) 80px;gap:8px;'
